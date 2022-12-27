@@ -2,6 +2,8 @@ import argparse
 import itertools
 import math
 import os
+import matplotlib.pyplot as plt
+import matplotlib.image as mpimg
 from pathlib import Path
 from typing import Optional
 import subprocess
@@ -41,6 +43,36 @@ def parse_args():
         type=str,
         default=None,
         help="Pretrained tokenizer name or path if not the same as model_name",
+    )
+    parser.add_argument(
+        "--save_sample_prompt",
+        type=str,
+        default=None,
+        help="The prompt used to generate sample outputs to save.",
+    )
+    parser.add_argument(
+        "--save_sample_negative_prompt",
+        type=str,
+        default=None,
+        help="The negative prompt used to generate sample outputs to save.",
+    )
+    parser.add_argument(
+        "--n_save_sample",
+        type=int,
+        default=4,
+        help="The number of samples to save.",
+    )
+    parser.add_argument(
+        "--save_guidance_scale",
+        type=float,
+        default=7.5,
+        help="CFG for save sample.",
+    )
+    parser.add_argument(
+        "--save_infer_steps",
+        type=int,
+        default=50,
+        help="The number of inference steps for save sample.",
     )
     parser.add_argument(
         "--instance_data_dir",
@@ -360,7 +392,7 @@ class DreamBoothDataset(Dataset):
             pt=pt.replace("_"," ")
             pt=pt.replace("(","")
             pt=pt.replace(")","")
-            pt=pt.replace("-","")
+            pt=pt.replace("-"," ")
             pt=pt.replace("conceptimagedb","")  
             
             if args.external_captions:
@@ -787,6 +819,24 @@ def main():
                         subprocess.call('python /content/diffusers/scripts/convertosdv2.py ' + save_dir + ' ' + chkpth + ' --fp16', shell=True)
                      else:
                         subprocess.call('python /content/diffusers/scripts/convertosdv2.py ' + save_dir + ' ' + chkpth, shell=True)
+                     if args.save_sample_prompt is not None:
+                        pipeline = pipeline.to(accelerator.device)
+                        g_cuda = torch.Generator(device=accelerator.device).manual_seed(args.seed)
+                        pipeline.set_progress_bar_config(disable=True)
+                        sample_dir = os.path.join(args.Session_dir+"/"+inst, "samples")
+                        os.makedirs(sample_dir, exist_ok=True)
+                        with torch.autocast("cuda"), torch.inference_mode():
+                          for i in tqdm(range(args.n_save_sample), desc="Generating samples"):
+                              images = pipeline(
+                                args.save_sample_prompt,
+                                negative_prompt=args.save_sample_negative_prompt,
+                                guidance_scale=args.save_guidance_scale,
+                                num_inference_steps=args.save_infer_steps,
+                                generator=g_cuda
+                              ).images  
+                              images[0].save(os.path.join(sample_dir, f"{ckpt_name}:{global_step}-{i}.png"))
+                        del pipeline
+                     print(f"[*] samples saved at {sample_dir}")   
                      print("Done, resuming training ...[0m")   
                      subprocess.call('rm -r '+ save_dir, shell=True)
                      i=i+args.save_n_steps
