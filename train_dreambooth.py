@@ -791,7 +791,7 @@ def main():
                 )
                 pipeline.text_encoder.save_pretrained(frz_dir)
                          
-            if args.save_n_steps >= 1:
+            if args.save_n_steps >= 25:
                if global_step < args.max_train_steps and global_step+1==i:
                   ckpt_name = "_step_" + str(global_step+1)
                   save_dir = Path(args.output_dir+ckpt_name)
@@ -826,7 +826,7 @@ def main():
                         sample_dir = os.path.join(args.Session_dir+"/"+inst, "samples")
                         os.makedirs(sample_dir, exist_ok=True)
                         with torch.autocast("cuda"), torch.inference_mode():
-                          for i in tqdm(range(args.n_save_sample), desc="Generating samples"):
+                          for I in tqdm(range(args.n_save_sample), desc="Generating samples"):
                               images = pipeline(
                                 args.save_sample_prompt,
                                 negative_prompt=args.save_sample_negative_prompt,
@@ -834,7 +834,7 @@ def main():
                                 num_inference_steps=args.save_infer_steps,
                                 generator=g_cuda
                               ).images  
-                              images[0].save(os.path.join(sample_dir, f"{ckpt_name}:{global_step}-{i}.png"))
+                              images[0].save(os.path.join(sample_dir, f"{ckpt_name}:{global_step}-{I}.png"))
                         del pipeline
                      print(f"[*] samples saved at {sample_dir}")   
                      print("Done, resuming training ...[0m")   
